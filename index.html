@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chime Timer</title>
+<style>
+  :root {
+    --ink: #2b3530;
+    --paper: #e9ece7;
+    --low: #5a7d6e;
+    --mid: #b8924f;
+    --faint: #c3cac2;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: Georgia, 'Times New Roman', serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .app { text-align: center; max-width: 420px; width: 100%; }
+  h1 {
+    font-size: 1.1rem;
+    font-weight: normal;
+    letter-spacing: 0.35em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .sub {
+    font-size: 0.85rem;
+    color: #6c7a72;
+    margin-bottom: 36px;
+  }
+
+  /* The bell circle */
+  .bell {
+    width: 180px;
+    height: 180px;
+    border-radius: 50%;
+    border: 1.5px solid var(--ink);
+    margin: 0 auto 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    position: relative;
+    transition: box-shadow 0.4s ease;
+  }
+  .bell .count {
+    font-size: 3rem;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .bell .of {
+    font-size: 0.75rem;
+    letter-spacing: 0.2em;
+    color: #6c7a72;
+    margin-top: 6px;
+  }
+  /* ripple on chime */
+  .ripple {
+    position: absolute;
+    inset: -1.5px;
+    border-radius: 50%;
+    border: 1.5px solid var(--low);
+    opacity: 0;
+    pointer-events: none;
+  }
+  .ripple.go-low { animation: ripple 1.6s ease-out; border-color: var(--low); }
+  .ripple.go-mid { animation: ripple 1.6s ease-out; border-color: var(--mid); }
+  @keyframes ripple {
+    0%   { transform: scale(1); opacity: 0.8; }
+    100% { transform: scale(1.55); opacity: 0; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ripple.go-low, .ripple.go-mid { animation: none; }
+  }
+
+  .tone-label {
+    height: 1.2em;
+    font-size: 0.85rem;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    margin-bottom: 28px;
+    color: #6c7a72;
+  }
+  .tone-label.low { color: var(--low); }
+  .tone-label.mid { color: var(--mid); }
+
+  /* progress dots: 50 cycles as 5 rows of 10 */
+  .dots {
+    display: grid;
+    grid-template-columns: repeat(10, 12px);
+    gap: 8px;
+    justify-content: center;
+    margin-bottom: 36px;
+  }
+  .dots span {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 1px solid var(--faint);
+    transition: background 0.3s, border-color 0.3s;
+  }
+  .dots span.low { background: var(--low); border-color: var(--low); }
+  .dots span.mid { background: var(--mid); border-color: var(--mid); }
+
+  button {
+    font-family: inherit;
+    font-size: 0.9rem;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    background: none;
+    color: var(--ink);
+    border: 1.5px solid var(--ink);
+    border-radius: 999px;
+    padding: 12px 38px;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+  }
+  button:hover { background: var(--ink); color: var(--paper); }
+  button:focus-visible { outline: 3px solid var(--mid); outline-offset: 3px; }
+  .controls { display: flex; gap: 12px; justify-content: center; }
+  .done-msg {
+    margin-top: 20px;
+    font-style: italic;
+    color: #6c7a72;
+    min-height: 1.2em;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <h1>Chime Timer</h1>
+  <div class="sub">A gentle bell every 5 seconds &middot; 50 cycles</div>
+
+  <div class="bell" id="bell">
+    <div class="ripple" id="ripple"></div>
+    <div class="count" id="count">0</div>
+    <div class="of">of 50</div>
+  </div>
+
+  <div class="tone-label" id="toneLabel">&nbsp;</div>
+
+  <div class="dots" id="dots"></div>
+
+  <div class="controls">
+    <button id="startBtn">Start</button>
+    <button id="resetBtn" style="display:none">Reset</button>
+  </div>
+  <div class="done-msg" id="doneMsg"></div>
+</div>
+
+<script>
+(function () {
+  const TOTAL = 50;
+  const INTERVAL_MS = 5000;
+  const LOW_HZ = 220;   // A3 — low tone
+  const MID_HZ = 440;   // A4 — medium tone
+
+  let ctx = null;
+  let timerId = null;
+  let cycle = 0;
+  let running = false;
+
+  const countEl = document.getElementById('count');
+  const toneLabel = document.getElementById('toneLabel');
+  const dotsEl = document.getElementById('dots');
+  const startBtn = document.getElementById('startBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const doneMsg = document.getElementById('doneMsg');
+  const ripple = document.getElementById('ripple');
+
+  // build 50 dots
+  const dots = [];
+  for (let i = 0; i < TOTAL; i++) {
+    const d = document.createElement('span');
+    dotsEl.appendChild(d);
+    dots.push(d);
+  }
+
+  function playChime(freq) {
+    // Gentle bell: sine fundamental + soft octave partial, slow decay
+    const now = ctx.currentTime;
+    const dur = 2.2;
+
+    const master = ctx.createGain();
+    master.gain.setValueAtTime(0.0001, now);
+    master.gain.exponentialRampToValueAtTime(0.25, now + 0.02); // soft attack
+    master.gain.exponentialRampToValueAtTime(0.0001, now + dur); // long fade
+    master.connect(ctx.destination);
+
+    const osc1 = ctx.createOscillator();
+    osc1.type = 'sine';
+    osc1.frequency.value = freq;
+    osc1.connect(master);
+
+    const partialGain = ctx.createGain();
+    partialGain.gain.value = 0.18;
+    partialGain.connect(master);
+    const osc2 = ctx.createOscillator();
+    osc2.type = 'sine';
+    osc2.frequency.value = freq * 2.76; // bell-like inharmonic partial
+    osc2.connect(partialGain);
+
+    osc1.start(now); osc2.start(now);
+    osc1.stop(now + dur); osc2.stop(now + dur);
+  }
+
+  function chimeCycle() {
+    cycle++;
+    const isLow = cycle % 2 === 1; // odd cycles low, even cycles medium
+    playChime(isLow ? LOW_HZ : MID_HZ);
+
+    countEl.textContent = cycle;
+    toneLabel.textContent = isLow ? 'Low tone' : 'Medium tone';
+    toneLabel.className = 'tone-label ' + (isLow ? 'low' : 'mid');
+    dots[cycle - 1].className = isLow ? 'low' : 'mid';
+
+    // restart ripple animation
+    ripple.className = 'ripple';
+    void ripple.offsetWidth;
+    ripple.className = 'ripple ' + (isLow ? 'go-low' : 'go-mid');
+
+    if (cycle >= TOTAL) {
+      stop();
+      doneMsg.textContent = 'All 50 chimes complete.';
+      startBtn.style.display = 'none';
+    }
+  }
+
+  function start() {
+    if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+    ctx.resume();
+    running = true;
+    startBtn.textContent = 'Pause';
+    resetBtn.style.display = '';
+    doneMsg.textContent = '';
+    chimeCycle(); // first chime immediately
+    if (cycle < TOTAL) timerId = setInterval(chimeCycle, INTERVAL_MS);
+  }
+
+  function stop() {
+    running = false;
+    clearInterval(timerId);
+    timerId = null;
+    startBtn.textContent = cycle > 0 && cycle < TOTAL ? 'Resume' : 'Start';
+  }
+
+  function reset() {
+    stop();
+    cycle = 0;
+    countEl.textContent = '0';
+    toneLabel.innerHTML = '&nbsp;';
+    toneLabel.className = 'tone-label';
+    doneMsg.textContent = '';
+    dots.forEach(d => d.className = '');
+    startBtn.style.display = '';
+    startBtn.textContent = 'Start';
+    resetBtn.style.display = 'none';
+  }
+
+  startBtn.addEventListener('click', () => running ? stop() : start());
+  resetBtn.addEventListener('click', reset);
+})();
+</script>
+</body>
+</html>
