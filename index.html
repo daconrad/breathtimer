@@ -52,10 +52,17 @@
   .picker button:focus-visible { outline: 3px solid var(--hold); outline-offset: 2px; }
 
   .desc {
-    font-size: 0.85rem; font-style: italic;
-    color: #5d6b64; min-height: 2.4em; margin-bottom: 28px;
+    font-size: 0.85rem;
+    color: #5d6b64; min-height: 4.6em; margin-bottom: 28px;
     line-height: 1.5;
   }
+  .desc .headline {
+    display: block;
+    font-style: normal;
+    font-size: 0.78rem; letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--ink); margin-bottom: 6px;
+  }
+  .desc .body { font-style: italic; }
 
   /* Breathing stage */
   .stage {
@@ -182,7 +189,8 @@
   const EXERCISES = {
     coherent: {
       label: 'Coherent 5–5',
-      desc: 'Equal inhale and exhale at about six breaths per minute — the pace linked to heart-rate-variability benefits. A calm daily default.',
+      headline: 'Calm and balance',
+      desc: 'Slows you to about six breaths a minute, the pace that nudges heart and nervous system into balance. A steadying daily reset for stress or focus.',
       cycles: 12,
       phases: [
         { name: 'Inhale', secs: 5, kind: 'inhale' },
@@ -191,7 +199,8 @@
     },
     box: {
       label: 'Box 4–4–4–4',
-      desc: 'Inhale, hold, exhale, hold — all four counts equal. Used to steady focus and calm under pressure.',
+      headline: 'Focus under pressure',
+      desc: 'The even four-count rhythm with holds quiets a racing mind and steadies nerves. Reach for it before something stressful or to regain composure.',
       cycles: 10,
       phases: [
         { name: 'Inhale', secs: 4, kind: 'inhale' },
@@ -202,7 +211,8 @@
     },
     relax: {
       label: '4–7–8',
-      desc: 'A short inhale, a long hold, and a slow extended exhale. The long out-breath leans into relaxation — good for winding down or sleep.',
+      headline: 'Wind down to sleep',
+      desc: 'The long, slow exhale tips the body toward rest and eases tension. Best for unwinding at night or settling anxiety before sleep.',
       cycles: 8,
       phases: [
         { name: 'Inhale', secs: 4, kind: 'inhale' },
@@ -233,6 +243,17 @@
   // ---- Elements ----
   const picker = document.getElementById('picker');
   const descEl = document.getElementById('desc');
+
+  function renderDesc(key) {
+    const ex = EXERCISES[key];
+    const h = document.createElement('span');
+    h.className = 'headline';
+    h.textContent = ex.headline;
+    const b = document.createElement('span');
+    b.className = 'body';
+    b.textContent = ex.desc;
+    descEl.replaceChildren(h, b);
+  }
   const orb = document.getElementById('orb');
   const ring = document.getElementById('ring');
   const phaseEl = document.getElementById('phase');
@@ -266,7 +287,7 @@
     current = key;
     [...picker.children].forEach(b =>
       b.classList.toggle('active', b.dataset.key === key));
-    descEl.textContent = EXERCISES[key].desc;
+    renderDesc(key);
     resetVisual();
   }
 
@@ -418,7 +439,7 @@
   resetBtn.addEventListener('click', reset);
 
   // init
-  descEl.textContent = EXERCISES[current].desc;
+  renderDesc(current);
   resetVisual();
 })();
 </script>
